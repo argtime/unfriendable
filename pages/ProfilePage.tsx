@@ -159,17 +159,20 @@ const ProfilePage: React.FC = () => {
         const { data: friends1 } = await supabase.from('friendships').select('user_2_profile:user_id_2(*)').eq('user_id_1', profile!.id).eq('status', 'accepted');
         const { data: friends2 } = await supabase.from('friendships').select('user_1_profile:user_id_1(*)').eq('user_id_2', profile!.id).eq('status', 'accepted');
         const friends = [...(friends1?.map(f => f.user_2_profile) || []), ...(friends2?.map(f => f.user_1_profile) || [])];
-        return friends.filter(Boolean) as UserProfile[];
+        // Fix: Use a type guard to correctly filter out null/undefined values and satisfy TypeScript's type checker.
+        return friends.filter((p): p is UserProfile => !!p);
     };
     
     const fetchFollowers = async (): Promise<UserProfile[]> => {
         const { data } = await supabase.from('follows').select('follower:follower_id(*)').eq('following_id', profile!.id);
-        return (data?.map(f => f.follower).filter(Boolean) as UserProfile[]) || [];
+        // Fix: Use a type guard to correctly filter out null/undefined values and satisfy TypeScript's type checker.
+        return (data?.map(f => f.follower).filter((p): p is UserProfile => !!p)) || [];
     };
 
     const fetchFollowing = async (): Promise<UserProfile[]> => {
         const { data } = await supabase.from('follows').select('following:following_id(*)').eq('follower_id', profile!.id);
-        return (data?.map(f => f.following).filter(Boolean) as UserProfile[]) || [];
+        // Fix: Use a type guard to correctly filter out null/undefined values and satisfy TypeScript's type checker.
+        return (data?.map(f => f.following).filter((p): p is UserProfile => !!p)) || [];
     };
 
     if (loading || !profile) {
@@ -195,6 +198,19 @@ const ProfilePage: React.FC = () => {
                 />
             )}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {profile.is_banned && (
+                    <div className="lg:col-span-3">
+                        <Card className="border-red-500/50 bg-red-500/10">
+                            <div className="flex items-center gap-4 text-red-400">
+                                <NoSymbolIcon className="h-8 w-8 shrink-0" />
+                                <div>
+                                    <h3 className="font-bold text-lg">This user is banned</h3>
+                                    {profile.ban_reason && <p className="text-sm">Reason: {profile.ban_reason}</p>}
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+                )}
                 <div className="lg:col-span-1 space-y-6">
                     <div className="relative">
                         <div className="h-24 md:h-32 rounded-t-lg bg-gradient-to-br from-accent/20 to-primary"></div>
@@ -218,58 +234,62 @@ const ProfilePage: React.FC = () => {
 
                     {!isSelf && (
                         <Card>
-                            <div className="flex flex-col gap-3">
-                                {/* Friend Actions */}
-                                {profile.is_friend ? (
-                                    <Button variant="danger" onClick={onRemoveFriend} loading={actionLoading === 'removeFriend'}><UserMinusIcon className="h-5 w-5 mr-2" />Remove Friend</Button>
-                                ) : profile.is_friend_pending_me ? (
-                                    <Button onClick={onAcceptFriend} loading={actionLoading === 'acceptFriend'}><CheckIcon className="h-5 w-5 mr-2" />Accept Friend Request</Button>
-                                ) : profile.is_friend_pending_them ? (
-                                    <Button disabled>Friend Request Sent</Button>
-                                ) : (
-                                    <Button onClick={onAddFriend} loading={actionLoading === 'addFriend'}><UserPlusIcon className="h-5 w-5 mr-2" />Add Friend</Button>
-                                )}
+                           {!profile.is_banned ? (
+                                <div className="flex flex-col gap-3">
+                                    {/* Friend Actions */}
+                                    {profile.is_friend ? (
+                                        <Button variant="danger" onClick={onRemoveFriend} loading={actionLoading === 'removeFriend'}><UserMinusIcon className="h-5 w-5 mr-2" />Remove Friend</Button>
+                                    ) : profile.is_friend_pending_me ? (
+                                        <Button onClick={onAcceptFriend} loading={actionLoading === 'acceptFriend'}><CheckIcon className="h-5 w-5 mr-2" />Accept Friend Request</Button>
+                                    ) : profile.is_friend_pending_them ? (
+                                        <Button disabled>Friend Request Sent</Button>
+                                    ) : (
+                                        <Button onClick={onAddFriend} loading={actionLoading === 'addFriend'}><UserPlusIcon className="h-5 w-5 mr-2" />Add Friend</Button>
+                                    )}
 
-                                {/* Follow Actions */}
-                                {profile.is_following ? (
-                                    <Button variant="secondary" onClick={onUnfollow} loading={actionLoading === 'unfollow'}><WifiIcon className="h-5 w-5 mr-2 rotate-45" />Unfollow</Button>
-                                ) : (
-                                    <Button variant="secondary" onClick={onFollow} loading={actionLoading === 'follow'}><RssIcon className="h-5 w-5 mr-2" />Follow</Button>
-                                )}
-                                
-                                {/* Best Friend Actions */}
-                                {profile.is_friend && (
-                                    <>
-                                        <div className="border-t border-gray-700 my-1"></div>
-                                        {profile.is_best_friend ? (
-                                            <Button variant="secondary" onClick={onRemoveBestFriend} loading={actionLoading === 'removeBestFriend'}><HeartIcon className="h-5 w-5 mr-2" />Remove Best Friend</Button>
-                                        ) : (
-                                            <Button variant="secondary" onClick={onMakeBestFriend} loading={actionLoading === 'addBestFriend'}><HeartIcon className="h-5 w-5 mr-2" />Make Best Friend</Button>
-                                        )}
-                                        {profile.is_best_friend_by && (
-                                            <div className="text-center p-2 bg-primary/70 rounded-md">
-                                                <p className="text-sm text-light">{profile.display_name} considers you a best friend.</p>
-                                                <button 
-                                                    onClick={onRemoveTheirBestFriendStatus}
-                                                    className="text-xs text-accent hover:underline mt-1 disabled:opacity-50"
-                                                    disabled={actionLoading === 'removeTheirBfs'}
-                                                >
-                                                    {actionLoading === 'removeTheirBfs' ? 'Revoking...' : 'Revoke Status'}
-                                                 </button>
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-                                <div className="border-t border-gray-700 my-1"></div>
+                                    {/* Follow Actions */}
+                                    {profile.is_following ? (
+                                        <Button variant="secondary" onClick={onUnfollow} loading={actionLoading === 'unfollow'}><WifiIcon className="h-5 w-5 mr-2 rotate-45" />Unfollow</Button>
+                                    ) : (
+                                        <Button variant="secondary" onClick={onFollow} loading={actionLoading === 'follow'}><RssIcon className="h-5 w-5 mr-2" />Follow</Button>
+                                    )}
+                                    
+                                    {/* Best Friend Actions */}
+                                    {profile.is_friend && (
+                                        <>
+                                            <div className="border-t border-gray-700 my-1"></div>
+                                            {profile.is_best_friend ? (
+                                                <Button variant="secondary" onClick={onRemoveBestFriend} loading={actionLoading === 'removeBestFriend'}><HeartIcon className="h-5 w-5 mr-2" />Remove Best Friend</Button>
+                                            ) : (
+                                                <Button variant="secondary" onClick={onMakeBestFriend} loading={actionLoading === 'addBestFriend'}><HeartIcon className="h-5 w-5 mr-2" />Make Best Friend</Button>
+                                            )}
+                                            {profile.is_best_friend_by && (
+                                                <div className="text-center p-2 bg-primary/70 rounded-md">
+                                                    <p className="text-sm text-light">{profile.display_name} considers you a best friend.</p>
+                                                    <button 
+                                                        onClick={onRemoveTheirBestFriendStatus}
+                                                        className="text-xs text-accent hover:underline mt-1 disabled:opacity-50"
+                                                        disabled={actionLoading === 'removeTheirBfs'}
+                                                    >
+                                                        {actionLoading === 'removeTheirBfs' ? 'Revoking...' : 'Revoke Status'}
+                                                     </button>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                    <div className="border-t border-gray-700 my-1"></div>
 
 
-                                {/* Hide Actions */}
-                                {profile.is_hidden ? (
-                                    <Button variant="secondary" onClick={onUnhideUser} loading={actionLoading === 'unhide'}><ArrowPathIcon className="h-5 w-5 mr-2" />Unhide User</Button>
-                                ) : (
-                                    <Button variant="secondary" onClick={onHideUser} loading={actionLoading === 'hide'}><NoSymbolIcon className="h-5 w-5 mr-2" />Hide User</Button>
-                                )}
-                            </div>
+                                    {/* Hide Actions */}
+                                    {profile.is_hidden ? (
+                                        <Button variant="secondary" onClick={onUnhideUser} loading={actionLoading === 'unhide'}><ArrowPathIcon className="h-5 w-5 mr-2" />Unhide User</Button>
+                                    ) : (
+                                        <Button variant="secondary" onClick={onHideUser} loading={actionLoading === 'hide'}><NoSymbolIcon className="h-5 w-5 mr-2" />Hide User</Button>
+                                    )}
+                                </div>
+                           ) : (
+                                <p className="text-center text-medium p-4">Actions are disabled for banned users.</p>
+                           )}
                         </Card>
                     )}
                 </div>

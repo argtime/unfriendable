@@ -22,6 +22,9 @@ export interface UserProfile {
   username: string;
   display_name: string;
   created_at: string;
+  is_banned: boolean;
+  banned_at: string | null;
+  ban_reason: string | null;
 }
 
 export interface FullUserProfile extends UserProfile {

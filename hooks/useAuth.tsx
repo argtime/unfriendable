@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useContext, ReactNode } from
 import { User } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
 import { AuthContextType, UserProfile } from '../types';
+import toast from 'react-hot-toast';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -20,6 +21,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (currentUser) {
         const { data: profileData } = await supabase.from('users').select('*').eq('id', currentUser.id).single();
         if (profileData) {
+           if (profileData.is_banned) {
+            toast.error(`Your account has been banned. Reason: ${profileData.ban_reason || 'No reason provided.'}`, { duration: 8000 });
+            await supabase.auth.signOut();
+            setUser(null);
+            setProfile(null);
+            setIsDev(false);
+            setLoading(false);
+            return;
+          }
           setProfile(profileData);
           setIsDev(profileData.username === 'devadmin' || currentUser.email === 'ryansh818@gmail.com');
         } else {
@@ -36,8 +46,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(currentUser);
       
       if (currentUser) {
+        setLoading(true);
         const { data: profileData } = await supabase.from('users').select('*').eq('id', currentUser.id).single();
         if (profileData) {
+          if (profileData.is_banned) {
+            toast.error(`Your account has been banned. Reason: ${profileData.ban_reason || 'No reason provided.'}`, { duration: 8000 });
+            await supabase.auth.signOut();
+            setUser(null);
+            setProfile(null);
+            setIsDev(false);
+            setLoading(false);
+            return;
+          }
           setProfile(profileData);
           setIsDev(profileData.username === 'devadmin' || currentUser.email === 'ryansh818@gmail.com');
         } else {

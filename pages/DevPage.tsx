@@ -35,19 +35,25 @@ const happeningTypesArray = Object.keys({
 
 
 // #region Modals
-const ManageUserModal: React.FC<{ user: UserProfile, onClose: () => void, onDataChange: () => void }> = ({ user, onClose, onDataChange }) => {
+const ManageUserModal: React.FC<{ user: UserProfile, onClose: () => void, onDataChange: () => void }> = ({ user: initialUser, onClose, onDataChange }) => {
+  const [user, setUser] = useState(initialUser);
   const [details, setDetails] = useState<UserDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('friends');
+  const [banReason, setBanReason] = useState(user.ban_reason || '');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [friendships, followers, following, happenings] = await Promise.all([
+    const [userRes, friendships, followers, following, happenings] = await Promise.all([
+      supabase.from('users').select('*').eq('id', user.id).single(),
       supabase.from('friendships').select('*, user_1_profile:user_id_1(*), user_2_profile:user_id_2(*)').or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`).eq('status', 'accepted'),
       supabase.from('follows').select('*, follower:follower_id(*)').eq('following_id', user.id),
       supabase.from('follows').select('*, following:following_id(*)').eq('follower_id', user.id),
       supabase.from('happenings').select('*, actor:actor_id(*), target:target_id(*)').or(`actor_id.eq.${user.id},target_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(50),
     ]);
+    
+    if (userRes.data) setUser(userRes.data);
+    setBanReason(userRes.data?.ban_reason || '');
     
     setDetails({
       friendships: (friendships.data as any) || [],
@@ -60,12 +66,15 @@ const ManageUserModal: React.FC<{ user: UserProfile, onClose: () => void, onData
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleDelete = async (action: () => Promise<any>, successMessage: string) => {
+  // Fix: Changed the 'action' parameter type from `() => Promise<any>` to `() => PromiseLike<{ error: any }>`
+  // to correctly type the 'thenable' Supabase query builder object, which is not a full Promise.
+  const handleDelete = async (action: () => PromiseLike<{ error: any }>, successMessage: string) => {
     try {
       const { error } = await action();
       if (error) throw error;
       toast.success(successMessage);
       fetchData();
+      onDataChange();
     } catch (error: any) {
       toast.error(`Failed: ${error.message}`);
     }
@@ -75,6 +84,21 @@ const ManageUserModal: React.FC<{ user: UserProfile, onClose: () => void, onData
   const deleteFollow = (id: number) => handleDelete(() => supabase.from('follows').delete().eq('id', id), 'Follow removed.');
   const deleteHappening = (id: number) => handleDelete(() => supabase.from('happenings').delete().eq('id', id), 'Happening deleted.');
   
+  const handleBanUser = async () => {
+      if (!window.confirm(`Are you sure you want to ban ${user.display_name}?`)) return;
+      handleDelete(
+          () => supabase.from('users').update({ is_banned: true, banned_at: new Date().toISOString(), ban_reason: banReason }).eq('id', user.id),
+          'User banned.'
+      );
+  };
+  
+  const handleUnbanUser = async () => {
+      handleDelete(
+          () => supabase.from('users').update({ is_banned: false, banned_at: null, ban_reason: null }).eq('id', user.id),
+          'User unbanned.'
+      );
+  };
+
   const handleDeleteUser = async () => {
     if (!window.confirm(`Are you sure you want to PERMANENTLY DELETE ${user.display_name} (@${user.username})?`)) return;
     if (prompt(`This action is irreversible. To confirm, type the username "${user.username}"`) !== user.username) {
@@ -110,6 +134,7 @@ const ManageUserModal: React.FC<{ user: UserProfile, onClose: () => void, onData
                     <h2 className="text-xl font-bold text-light">{user.display_name}</h2>
                     <p className="text-sm text-medium">@{user.username}</p>
                 </div>
+                {user.is_banned && <span className="text-xs bg-red-600 text-light font-bold px-2 py-0.5 rounded-full">BANNED</span>}
             </div>
             <button onClick={onClose} className="text-gray-400 hover:text-white"><XMarkIcon className="h-6 w-6" /></button>
         </header>
@@ -137,6 +162,25 @@ const ManageUserModal: React.FC<{ user: UserProfile, onClose: () => void, onData
             </div>
           }
         </main>
+
+        <div className="p-4 border-t border-gray-700 space-y-3 bg-primary/30">
+            <h3 className="text-lg font-semibold text-accent">Ban Management</h3>
+            {user.is_banned ? (
+                <div>
+                    <p><span className="font-semibold text-medium">Status:</span> <span className="text-red-500 font-bold">Banned</span></p>
+                    {user.banned_at && <p><span className="font-semibold text-medium">Banned On:</span> {new Date(user.banned_at).toLocaleString()}</p>}
+                    <p><span className="font-semibold text-medium">Reason:</span> {user.ban_reason || 'N/A'}</p>
+                    <Button variant="secondary" onClick={handleUnbanUser} className="mt-2">Unban User</Button>
+                </div>
+            ) : (
+                <div>
+                    <p><span className="font-semibold text-medium">Status:</span> <span className="text-green-500 font-semibold">Active</span></p>
+                    <label htmlFor="banReason" className="block text-sm font-medium text-medium mb-1 mt-2">Ban Reason</label>
+                    <Input id="banReason" value={banReason} onChange={e => setBanReason(e.target.value)} placeholder="Reason for ban..." />
+                    <Button variant="danger" onClick={handleBanUser} className="mt-2">Ban User</Button>
+                </div>
+            )}
+        </div>
         
         <footer className="p-4 border-t border-gray-700 bg-primary/50 rounded-b-lg">
             <Button variant="danger" className="w-full" onClick={handleDeleteUser}>
@@ -337,7 +381,10 @@ const DevPage: React.FC = () => {
                             </tr></thead>
                             <tbody>{users.map((user) => (
                                 <tr key={user.id} className="border-b border-gray-800 hover:bg-gray-800/50">
-                                    <td className="p-3">{user.display_name}</td>
+                                    <td className="p-3 flex items-center">
+                                        {user.display_name}
+                                        {user.is_banned && <span className="ml-2 text-xs bg-red-600 text-light font-bold px-2 py-0.5 rounded-full">BANNED</span>}
+                                    </td>
                                     <td className="p-3 font-mono text-accent">@{user.username}</td>
                                     <td className="p-3 font-mono text-sm text-medium hidden md:table-cell">{user.id}</td>
                                     <td className="p-3 text-medium hidden sm:table-cell">{new Date(user.created_at).toLocaleDateString()}</td>
