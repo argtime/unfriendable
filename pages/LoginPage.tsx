@@ -22,7 +22,7 @@ const LoginPage: React.FC = () => {
       toast.error(error.message);
     } else {
       toast.success('Logged in successfully!');
-      navigate('/');
+      navigate('/home');
     }
   };
 
@@ -43,10 +43,7 @@ const LoginPage: React.FC = () => {
             />
           </div>
           <div>
-             <div className="flex justify-between items-center mb-1">
-                <label htmlFor="password" className="block text-sm font-medium text-medium">Password</label>
-                <Link to="/forgot-password" className="text-xs text-medium hover:text-accent transition-colors">Forgot Password?</Link>
-            </div>
+            <label htmlFor="password" className="block text-sm font-medium text-medium mb-1">Password</label>
             <Input
               id="password"
               type="password"

@@ -13,62 +13,45 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isDev, setIsDev] = useState(false);
 
   useEffect(() => {
-    const checkUserSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-
-      if (currentUser) {
-        const { data: profileData } = await supabase.from('users').select('*').eq('id', currentUser.id).single();
-        if (profileData) {
-           if (profileData.is_banned) {
-            toast.error(`Your account has been banned. Reason: ${profileData.ban_reason || 'No reason provided.'}`, { duration: 8000 });
-            await supabase.auth.signOut();
-            setUser(null);
-            setProfile(null);
-            setIsDev(false);
-            setLoading(false);
-            return;
-          }
-          setProfile(profileData);
-          setIsDev(profileData.username === 'devadmin' || currentUser.email === 'ryansh818@gmail.com');
-        } else {
-          setIsDev(currentUser.email === 'ryansh818@gmail.com');
-        }
-      }
-      setLoading(false);
-    };
-
-    checkUserSession();
-
+    // onAuthStateChange fires an INITIAL_SESSION event on load, which handles
+    // the initial check. This removes the need for a separate getSession() call.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-      
+
       if (currentUser) {
         setLoading(true);
-        const { data: profileData } = await supabase.from('users').select('*').eq('id', currentUser.id).single();
-        if (profileData) {
-          if (profileData.is_banned) {
-            toast.error(`Your account has been banned. Reason: ${profileData.ban_reason || 'No reason provided.'}`, { duration: 8000 });
-            await supabase.auth.signOut();
-            setUser(null);
+        try {
+          const { data: profileData, error } = await supabase.from('users').select('*').eq('id', currentUser.id).single();
+
+          if (error) throw error;
+          
+          if (profileData) {
+            if (profileData.is_banned) {
+              toast.error(`Your account has been banned. Reason: ${profileData.ban_reason || 'No reason provided.'}`, { duration: 8000 });
+              await supabase.auth.signOut();
+              // No need to set state; signOut will trigger another auth event.
+              return; 
+            }
+            setProfile(profileData);
+            setIsDev(profileData.username === 'devadmin' || currentUser.email === 'ryansh818@gmail.com');
+          } else {
             setProfile(null);
-            setIsDev(false);
-            setLoading(false);
-            return;
+            setIsDev(currentUser.email === 'ryansh818@gmail.com');
           }
-          setProfile(profileData);
-          setIsDev(profileData.username === 'devadmin' || currentUser.email === 'ryansh818@gmail.com');
-        } else {
-          setProfile(null);
-          setIsDev(currentUser.email === 'ryansh818@gmail.com');
+        } catch (e: any) {
+          toast.error(`Session error: ${e.message}. Please sign in again.`);
+          console.error("Auth state change error:", e);
+          await supabase.auth.signOut();
+        } finally {
+          setLoading(false);
         }
       } else {
+        // User is null (logged out)
         setProfile(null);
         setIsDev(false);
+        setLoading(false); // We are done loading.
       }
-      setLoading(false);
     });
 
     return () => {
@@ -78,9 +61,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   
   const signOut = async () => {
     await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-    setIsDev(false);
+    // State clearing is handled by the onAuthStateChange listener.
   };
 
 

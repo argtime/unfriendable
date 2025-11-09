@@ -15,8 +15,13 @@ const ForgotPasswordPage: React.FC = () => {
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    // This constructs the base URL by safely removing any existing hash, making it more robust.
+    const baseUrl = window.location.href.split('#')[0];
+    const redirectTo = `${baseUrl}#/update-password`;
+
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}${window.location.pathname}#/update-password`,
+      redirectTo: redirectTo,
     });
     setLoading(false);
     if (error) {

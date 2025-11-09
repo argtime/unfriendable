@@ -1,8 +1,8 @@
 
 import React, { Suspense, lazy } from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { AuthProvider } from './hooks/useAuth';
+import { AuthProvider, useAuth } from './hooks/useAuth';
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Spinner from './components/ui/Spinner';
@@ -13,8 +13,21 @@ const SignupPage = lazy(() => import('./pages/SignupPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const DevPage = lazy(() => import('./pages/DevPage'));
 const SearchPage = lazy(() => import('./pages/SearchPage'));
-const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
-const UpdatePasswordPage = lazy(() => import('./pages/UpdatePasswordPage'));
+
+const RootRedirect: React.FC = () => {
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <Spinner />
+      </div>
+    );
+  }
+
+  // If we have a user, go to home. Otherwise, go to login.
+  return <Navigate to={user ? "/home" : "/login"} replace />;
+};
 
 const App: React.FC = () => {
   return (
@@ -23,11 +36,10 @@ const App: React.FC = () => {
         <Layout>
           <Suspense fallback={<div className="flex justify-center items-center h-screen"><Spinner /></div>}>
             <Routes>
+              <Route path="/" element={<RootRedirect />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/update-password" element={<UpdatePasswordPage />} />
-              <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+              <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
               <Route path="/profile/:username" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
               <Route path="/dev" element={<ProtectedRoute><DevPage /></ProtectedRoute>} />
               <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />

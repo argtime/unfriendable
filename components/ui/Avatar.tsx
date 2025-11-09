@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 
 interface AvatarProps {
   displayName: string;
@@ -66,4 +66,4 @@ const Avatar: React.FC<AvatarProps> = ({ displayName, imageUrl, size = 'md', cla
   );
 };
 
-export default Avatar;
+export default memo(Avatar);

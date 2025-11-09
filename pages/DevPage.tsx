@@ -44,23 +44,28 @@ const ManageUserModal: React.FC<{ user: UserProfile, onClose: () => void, onData
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [userRes, friendships, followers, following, happenings] = await Promise.all([
-      supabase.from('users').select('*').eq('id', user.id).single(),
-      supabase.from('friendships').select('*, user_1_profile:user_id_1(*), user_2_profile:user_id_2(*)').or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`).eq('status', 'accepted'),
-      supabase.from('follows').select('*, follower:follower_id(*)').eq('following_id', user.id),
-      supabase.from('follows').select('*, following:following_id(*)').eq('follower_id', user.id),
-      supabase.from('happenings').select('*, actor:actor_id(*), target:target_id(*)').or(`actor_id.eq.${user.id},target_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(50),
-    ]);
-    
-    if (userRes.data) setUser(userRes.data);
-    
-    setDetails({
-      friendships: (friendships.data as any) || [],
-      followers: (followers.data as any) || [],
-      following: (following.data as any) || [],
-      happenings: (happenings.data as any) || [],
-    });
-    setLoading(false);
+    try {
+      const [userRes, friendships, followers, following, happenings] = await Promise.all([
+        supabase.from('users').select('*').eq('id', user.id).single(),
+        supabase.from('friendships').select('*, user_1_profile:user_id_1(*), user_2_profile:user_id_2(*)').or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`).eq('status', 'accepted'),
+        supabase.from('follows').select('*, follower:follower_id(*)').eq('following_id', user.id),
+        supabase.from('follows').select('*, following:following_id(*)').eq('follower_id', user.id),
+        supabase.from('happenings').select('*, actor:actor_id(*), target:target_id(*)').or(`actor_id.eq.${user.id},target_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(50),
+      ]);
+      
+      if (userRes.data) setUser(userRes.data);
+      
+      setDetails({
+        friendships: (friendships.data as any) || [],
+        followers: (followers.data as any) || [],
+        following: (following.data as any) || [],
+        happenings: (happenings.data as any) || [],
+      });
+    } catch(err: any) {
+        toast.error(`Could not load user details: ${err.message}`)
+    } finally {
+        setLoading(false);
+    }
   }, [user.id]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -259,7 +264,7 @@ const ManageHappeningModal: React.FC<{
 // #endregion
 
 // #region List Items
-const ListItem: React.FC<{ user: UserProfile, onDelete: () => void }> = ({ user, onDelete }) => (
+const ListItem: React.FC<{ user: UserProfile, onDelete: () => void }> = React.memo(({ user, onDelete }) => (
     <div className="flex justify-between items-center bg-primary p-2 rounded-md">
         <Link to={`/profile/${user.username}`} className="flex items-center gap-3">
             <Avatar displayName={user.display_name} imageUrl={user.avatar_url} size="sm" />
@@ -270,9 +275,9 @@ const ListItem: React.FC<{ user: UserProfile, onDelete: () => void }> = ({ user,
         </Link>
         <Button variant="secondary" className="!p-2" onClick={onDelete}><TrashIcon className="h-4 w-4 text-red-500" /></Button>
     </div>
-);
+));
 
-const ActivityItem: React.FC<{ happening: Happening, onDelete: () => void }> = ({ happening, onDelete }) => (
+const ActivityItem: React.FC<{ happening: Happening, onDelete: () => void }> = React.memo(({ happening, onDelete }) => (
     <div className="flex justify-between items-center bg-primary p-2 rounded-md text-sm">
         <p>
             <span className="font-bold text-accent">{happening.actor.display_name}</span> {happening.action_type.replace(/_/g, ' ').toLowerCase()} {happening.target && <span className="font-bold text-accent">{happening.target.display_name}</span>}
@@ -282,7 +287,7 @@ const ActivityItem: React.FC<{ happening: Happening, onDelete: () => void }> = (
              <Button variant="secondary" className="!p-2" onClick={onDelete}><TrashIcon className="h-4 w-4 text-red-500" /></Button>
         </div>
     </div>
-);
+));
 // #endregion
 
 const DevPage: React.FC = () => {
@@ -297,22 +302,26 @@ const DevPage: React.FC = () => {
 
     const fetchData = useCallback(async () => {
         setLoading(true);
-        const [usersRes, happeningsRes] = await Promise.all([
-            supabase.from('users').select('*').order('created_at', { ascending: false }),
-            supabase.from('happenings').select('*, actor:actor_id(*), target:target_id(*)').order('created_at', { ascending: false }).limit(100),
-        ]);
+        try {
+            const [usersRes, happeningsRes] = await Promise.all([
+                supabase.from('users').select('*').order('created_at', { ascending: false }),
+                supabase.from('happenings').select('*, actor:actor_id(*), target:target_id(*)').order('created_at', { ascending: false }).limit(100),
+            ]);
 
-        if (usersRes.error) toast.error('Failed to fetch users');
-        else setUsers(usersRes.data || []);
-        
-        if (happeningsRes.error) toast.error('Failed to fetch happenings');
-        else setHappenings(happeningsRes.data as any[] || []);
-
-        setLoading(false);
+            if (usersRes.error) throw usersRes.error;
+            setUsers(usersRes.data || []);
+            
+            if (happeningsRes.error) throw happeningsRes.error;
+            setHappenings(happeningsRes.data as any[] || []);
+        } catch (error: any) {
+            toast.error(`Failed to fetch dev data: ${error.message}`);
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
     useEffect(() => {
-        if (!authLoading && !isDev) navigate('/');
+        if (!authLoading && !isDev) navigate('/home');
     }, [isDev, authLoading, navigate]);
 
     useEffect(() => {

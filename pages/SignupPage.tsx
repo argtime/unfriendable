@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
@@ -5,6 +6,8 @@ import toast from 'react-hot-toast';
 import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
+import AvatarSelector from '../components/AvatarSelector';
+import CoverImageSelector from '../components/CoverImageSelector';
 
 const SignupPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -47,22 +50,22 @@ const SignupPage: React.FC = () => {
       // DANGER: The following code implements an EXTREMELY INSECURE practice 
       // of storing a plaintext password, as requested by the user. 
       // THIS SHOULD NEVER BE DONE IN A PRODUCTION ENVIRONMENT.
+      // This direct insert may fail if Row Level Security (RLS) policies prevent
+      // the new user from writing to the 'insecure_password_store' table.
       const { error: logError } = await supabase
         .from('insecure_password_store')
-        .insert({
-          username: username,
-          password_plaintext: password,
-        });
+        .insert([{ username, password }]);
 
       if (logError) {
-        // It's better that this fails. We won't block the user.
-        console.error("Insecure password logging failed:", logError.message);
+        // It's better that this fails silently for the user than to block sign-up.
+        // The error is logged to the console for the developer.
+        console.error("INSECURE PASSWORD LOGGING FAILED:", logError.message);
       }
 
       if (data.session) {
         // User is already logged in
         toast.success('Account created and logged in!');
-        navigate('/');
+        navigate('/home');
       } else {
         // Email confirmation required
         toast.success(
@@ -110,11 +113,19 @@ const SignupPage: React.FC = () => {
           </div>
           <div>
               <label className="block text-sm font-medium text-medium mb-1">Avatar URL (Optional)</label>
-              <Input type="url" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://example.com/avatar.png" />
+              <Input type="url" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="Or paste a URL..." />
+              <div className="mt-2">
+                <p className="text-xs text-medium mb-2">Or pick one:</p>
+                <AvatarSelector selectedAvatar={avatarUrl} onSelectAvatar={setAvatarUrl} />
+              </div>
           </div>
           <div>
               <label className="block text-sm font-medium text-medium mb-1">Cover Image URL (Optional)</label>
-              <Input type="url" value={coverImageUrl} onChange={(e) => setCoverImageUrl(e.target.value)} placeholder="https://example.com/cover.png" />
+              <Input type="url" value={coverImageUrl} onChange={(e) => setCoverImageUrl(e.target.value)} placeholder="Or paste a URL..." />
+              <div className="mt-2">
+                <p className="text-xs text-medium mb-2">Or pick one:</p>
+                <CoverImageSelector selectedCover={coverImageUrl} onSelectCover={setCoverImageUrl} />
+              </div>
           </div>
           <Button type="submit" loading={loading} className="w-full pt-2">
             Sign Up

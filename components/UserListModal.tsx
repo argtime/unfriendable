@@ -14,15 +14,23 @@ interface UserListModalProps {
 const UserListModal: React.FC<UserListModalProps> = ({ title, fetchUsers, onClose }) => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     setIsVisible(true);
     const loadUsers = async () => {
       setLoading(true);
-      const fetchedUsers = await fetchUsers();
-      setUsers(fetchedUsers);
-      setLoading(false);
+      setError(null);
+      try {
+        const fetchedUsers = await fetchUsers();
+        setUsers(fetchedUsers);
+      } catch (e: any) {
+        setError("Could not load user list.");
+        console.error("Failed to fetch users in modal:", e);
+      } finally {
+        setLoading(false);
+      }
     };
     loadUsers();
   }, [fetchUsers]);
@@ -50,6 +58,8 @@ const UserListModal: React.FC<UserListModalProps> = ({ title, fetchUsers, onClos
         <main className="overflow-y-auto flex-grow p-4">
           {loading ? (
             <div className="flex justify-center py-10"><Spinner /></div>
+          ) : error ? (
+             <p className="text-center text-red-500 py-10">{error}</p>
           ) : users.length > 0 ? (
             <div className="space-y-3">
               {users.map(user => (

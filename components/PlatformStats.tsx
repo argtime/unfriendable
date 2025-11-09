@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
-import { HappeningType } from '../types';
 import Spinner from './ui/Spinner';
-import { UsersIcon, UserPlusIcon, SparklesIcon, FireIcon } from '@heroicons/react/24/outline';
+import { UsersIcon, UserPlusIcon, SparklesIcon, UserMinusIcon } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 
 interface Stats {
   totalUsers: number | null;
   newUsersToday: number | null;
   totalHappenings: number | null;
-  mostFrequentAction: { type: string; count: number } | null;
+  totalUnfriends: number | null;
 }
 
 const StatCard: React.FC<{ icon: React.ElementType, title: string, value: string | number, isLoading: boolean }> = ({ icon: Icon, title, value, isLoading }) => (
@@ -30,46 +30,43 @@ const PlatformStats: React.FC = () => {
         totalUsers: null,
         newUsersToday: null,
         totalHappenings: null,
-        mostFrequentAction: null
+        totalUnfriends: null
     });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchStats = async () => {
             setLoading(true);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
+            try {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
 
-            const [
-                { count: totalUsers },
-                { count: newUsersToday },
-                { count: totalHappenings },
-                { data: recentHappenings }
-            ] = await Promise.all([
-                supabase.from('users').select('*', { count: 'exact', head: true }),
-                supabase.from('users').select('*', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
-                supabase.from('happenings').select('*', { count: 'exact', head: true }),
-                supabase.from('happenings').select('action_type').limit(1000)
-            ]);
-            
-            let mostFrequent: { type: string; count: number } | null = null;
-            if (recentHappenings && recentHappenings.length > 0) {
-                const counts = recentHappenings.reduce((acc, { action_type }) => {
-                    acc[action_type] = (acc[action_type] || 0) + 1;
-                    return acc;
-                }, {} as Record<HappeningType, number>);
+                const [
+                    { count: totalUsers, error: e1 },
+                    { count: newUsersToday, error: e2 },
+                    { count: totalHappenings, error: e3 },
+                    { count: totalUnfriends, error: e4 }
+                ] = await Promise.all([
+                    supabase.from('users').select('*', { count: 'exact', head: true }),
+                    supabase.from('users').select('*', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
+                    supabase.from('happenings').select('*', { count: 'exact', head: true }),
+                    supabase.from('happenings').select('*', { count: 'exact', head: true }).eq('action_type', 'REMOVED_FRIEND')
+                ]);
+
+                if (e1 || e2 || e3 || e4) throw new Error(e1?.message || e2?.message || e3?.message || e4?.message);
                 
-                const [type, count] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-                mostFrequent = { type, count };
+                setStats({
+                    totalUsers,
+                    newUsersToday,
+                    totalHappenings,
+                    totalUnfriends,
+                });
+            } catch (err: any) {
+                console.error("Stat loading error:", err);
+                toast.error("Could not load platform stats.");
+            } finally {
+                setLoading(false);
             }
-
-            setStats({
-                totalUsers,
-                newUsersToday,
-                totalHappenings,
-                mostFrequentAction: mostFrequent
-            });
-            setLoading(false);
         };
 
         fetchStats();
@@ -98,9 +95,9 @@ const PlatformStats: React.FC = () => {
                     isLoading={loading}
                 />
                  <StatCard 
-                    icon={FireIcon} 
-                    title="Hottest Action" 
-                    value={stats.mostFrequentAction?.type.replace(/_/g, ' ') ?? '...'} 
+                    icon={UserMinusIcon} 
+                    title="Total Unfriends" 
+                    value={stats.totalUnfriends ?? '...'} 
                     isLoading={loading}
                 />
             </div>

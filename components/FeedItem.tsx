@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Happening, HappeningType } from '../types';
 import { Link } from 'react-router-dom';
 import {
@@ -89,4 +89,4 @@ const FeedItem: React.FC<{ happening: Happening }> = ({ happening }) => {
   );
 };
 
-export default FeedItem;
+export default memo(FeedItem);

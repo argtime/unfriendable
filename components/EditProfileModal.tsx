@@ -6,6 +6,8 @@ import toast from 'react-hot-toast';
 import Button from './ui/Button';
 import Input from './ui/Input';
 import Avatar from './ui/Avatar';
+import AvatarSelector from './AvatarSelector';
+import CoverImageSelector from './CoverImageSelector';
 
 interface EditProfileModalProps {
   userProfile: UserProfile;
@@ -106,8 +108,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ userProfile, onClos
               type="url"
               value={avatarUrl}
               onChange={(e) => setAvatarUrl(e.target.value)}
-              placeholder="https://example.com/avatar.png"
+              placeholder="Or paste a URL..."
             />
+            <div className="mt-2">
+                <p className="text-xs text-medium mb-2">Or pick one:</p>
+                <AvatarSelector selectedAvatar={avatarUrl} onSelectAvatar={setAvatarUrl} />
+            </div>
           </div>
            <div>
             <label className="block text-sm font-medium text-medium mb-1">Cover Image URL</label>
@@ -115,8 +121,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ userProfile, onClos
               type="url"
               value={coverImageUrl}
               onChange={(e) => setCoverImageUrl(e.target.value)}
-              placeholder="https://example.com/cover.png"
+              placeholder="Or paste a URL..."
             />
+            <div className="mt-2">
+                <p className="text-xs text-medium mb-2">Or pick one:</p>
+                <CoverImageSelector selectedCover={coverImageUrl} onSelectCover={setCoverImageUrl} />
+            </div>
           </div>
         </main>
         

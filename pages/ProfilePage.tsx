@@ -31,65 +31,70 @@ const ProfilePage: React.FC = () => {
     const [coverImageError, setCoverImageError] = useState(false);
 
     const fetchProfileData = useCallback(async () => {
-        setCoverImageError(false);
         if (!username || !currentUserProfile) return;
-        
-        const { data: userData, error: userError } = await supabase.from('users').select('*').eq('username', username).single();
-        if (userError || !userData) {
-            toast.error("User not found.");
-            navigate('/');
-            return;
+        setLoading(true);
+        setCoverImageError(false);
+
+        try {
+            const { data: userData, error: userError } = await supabase.from('users').select('*').eq('username', username).single();
+            if (userError || !userData) {
+                toast.error("User not found.");
+                navigate('/home');
+                return;
+            }
+
+            const [
+                friendship, following, followed, bestFriend, bestFriendBy, hidden,
+                profileHappenings, friendsCount1, friendsCount2, followersCount, followingCount, hiddenCount
+            ] = await Promise.all([
+                supabase.from('friendships').select('*').or(`and(user_id_1.eq.${currentUserProfile.id},user_id_2.eq.${userData.id}),and(user_id_1.eq.${userData.id},user_id_2.eq.${currentUserProfile.id})`).maybeSingle(),
+                supabase.from('follows').select('id', { head: true, count: 'exact' }).eq('follower_id', currentUserProfile.id).eq('following_id', userData.id).maybeSingle(),
+                supabase.from('follows').select('id', { head: true, count: 'exact' }).eq('follower_id', userData.id).eq('following_id', currentUserProfile.id).maybeSingle(),
+                supabase.from('best_friends').select('id', { head: true, count: 'exact' }).eq('user_id', currentUserProfile.id).eq('best_friend_id', userData.id).maybeSingle(),
+                supabase.from('best_friends').select('id', { head: true, count: 'exact' }).eq('user_id', userData.id).eq('best_friend_id', currentUserProfile.id).maybeSingle(),
+                supabase.from('hidden_users').select('id', { head: true, count: 'exact' }).eq('user_id', currentUserProfile.id).eq('hidden_user_id', userData.id).maybeSingle(),
+                supabase.from('happenings').select(`*, actor:actor_id(*), target:target_id(*)`).or(`actor_id.eq.${userData.id},target_id.eq.${userData.id}`).order('created_at', { ascending: false }).limit(20),
+                supabase.from('friendships').select('*', { count: 'exact', head: true }).eq('user_id_1', userData.id).eq('status', 'accepted'),
+                supabase.from('friendships').select('*', { count: 'exact', head: true }).eq('user_id_2', userData.id).eq('status', 'accepted'),
+                supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', userData.id),
+                supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', userData.id),
+                supabase.from('hidden_users').select('*', { count: 'exact', head: true }).eq('user_id', userData.id),
+            ]);
+
+            setStats({
+                friends: (friendsCount1.count || 0) + (friendsCount2.count || 0),
+                followers: followersCount.count || 0,
+                following: followingCount.count || 0,
+                hidden: hiddenCount.count || 0,
+            });
+
+            const fullProfile: FullUserProfile = {
+                ...(userData as UserProfile),
+                is_friend: friendship.data?.status === 'accepted',
+                is_friend_pending_me: friendship.data?.status === 'pending' && friendship.data?.user_id_2 === currentUserProfile.id,
+                is_friend_pending_them: friendship.data?.status === 'pending' && friendship.data?.user_id_1 === currentUserProfile.id,
+                is_following: !!following.count,
+                is_followed_by: !!followed.count,
+                is_best_friend: !!bestFriend.count,
+                is_best_friend_by: !!bestFriendBy.count,
+                is_hidden: !!hidden.count,
+            };
+
+            setProfile(fullProfile);
+            setHappenings(profileHappenings.data as Happening[] || []);
+            
+            if (currentUserProfile.id !== userData.id) {
+                await supabase.from('happenings').insert({ actor_id: currentUserProfile.id, action_type: 'VIEWED_PROFILE', target_id: userData.id });
+            }
+        } catch(error: any) {
+            toast.error(`Failed to load profile: ${error.message}`);
+            navigate('/home');
+        } finally {
+            setLoading(false);
         }
-
-        const [
-            friendship, following, followed, bestFriend, bestFriendBy, hidden,
-            profileHappenings, friendsCount1, friendsCount2, followersCount, followingCount, hiddenCount
-        ] = await Promise.all([
-            supabase.from('friendships').select('*').or(`and(user_id_1.eq.${currentUserProfile.id},user_id_2.eq.${userData.id}),and(user_id_1.eq.${userData.id},user_id_2.eq.${currentUserProfile.id})`).maybeSingle(),
-            supabase.from('follows').select('id', { head: true, count: 'exact' }).eq('follower_id', currentUserProfile.id).eq('following_id', userData.id).maybeSingle(),
-            supabase.from('follows').select('id', { head: true, count: 'exact' }).eq('follower_id', userData.id).eq('following_id', currentUserProfile.id).maybeSingle(),
-            supabase.from('best_friends').select('id', { head: true, count: 'exact' }).eq('user_id', currentUserProfile.id).eq('best_friend_id', userData.id).maybeSingle(),
-            supabase.from('best_friends').select('id', { head: true, count: 'exact' }).eq('user_id', userData.id).eq('best_friend_id', currentUserProfile.id).maybeSingle(),
-            supabase.from('hidden_users').select('id', { head: true, count: 'exact' }).eq('user_id', currentUserProfile.id).eq('hidden_user_id', userData.id).maybeSingle(),
-            supabase.from('happenings').select(`*, actor:actor_id(*), target:target_id(*)`).or(`actor_id.eq.${userData.id},target_id.eq.${userData.id}`).order('created_at', { ascending: false }).limit(20),
-            supabase.from('friendships').select('*', { count: 'exact', head: true }).eq('user_id_1', userData.id).eq('status', 'accepted'),
-            supabase.from('friendships').select('*', { count: 'exact', head: true }).eq('user_id_2', userData.id).eq('status', 'accepted'),
-            supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', userData.id),
-            supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', userData.id),
-            supabase.from('hidden_users').select('*', { count: 'exact', head: true }).eq('user_id', userData.id),
-        ]);
-
-        setStats({
-            friends: (friendsCount1.count || 0) + (friendsCount2.count || 0),
-            followers: followersCount.count || 0,
-            following: followingCount.count || 0,
-            hidden: hiddenCount.count || 0,
-        });
-
-        const fullProfile: FullUserProfile = {
-            ...(userData as UserProfile),
-            is_friend: friendship.data?.status === 'accepted',
-            is_friend_pending_me: friendship.data?.status === 'pending' && friendship.data?.user_id_2 === currentUserProfile.id,
-            is_friend_pending_them: friendship.data?.status === 'pending' && friendship.data?.user_id_1 === currentUserProfile.id,
-            is_following: !!following.count,
-            is_followed_by: !!followed.count,
-            is_best_friend: !!bestFriend.count,
-            is_best_friend_by: !!bestFriendBy.count,
-            is_hidden: !!hidden.count,
-        };
-
-        setProfile(fullProfile);
-        setHappenings(profileHappenings.data as Happening[] || []);
-        
-        if (currentUserProfile.id !== userData.id) {
-            await supabase.from('happenings').insert({ actor_id: currentUserProfile.id, action_type: 'VIEWED_PROFILE', target_id: userData.id });
-        }
-
-        setLoading(false);
     }, [username, currentUserProfile, navigate]);
 
     useEffect(() => {
-        setLoading(true);
         fetchProfileData();
     }, [fetchProfileData]);
 

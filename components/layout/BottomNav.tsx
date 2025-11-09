@@ -12,7 +12,7 @@ const BottomNav: React.FC = () => {
   if (!profile) return null;
 
   const navItems = [
-    { path: '/', icon: HomeIcon, label: 'Home' },
+    { path: '/home', icon: HomeIcon, label: 'Home' },
     { path: '/search', icon: MagnifyingGlassIcon, label: 'Search' },
     { path: `/profile/${profile.username}`, icon: UserIcon, label: 'Profile' },
   ];
@@ -24,7 +24,7 @@ const BottomNav: React.FC = () => {
           <NavLink
             key={item.label}
             to={item.path}
-            end={item.path === '/'}
+            end={item.path === '/home'}
             className={({ isActive }) => {
               const isProfilePage = item.label === 'Profile' && location.pathname.startsWith('/profile/');
               const finalIsActive = isActive || isProfilePage;

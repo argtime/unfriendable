@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { Happening, HappeningType } from '../types';
@@ -53,83 +54,82 @@ const HomePage: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    let query = supabase
-      .from('happenings')
-      .select('*, actor:actor_id(*), target:target_id(*)');
+    try {
+      let query = supabase
+        .from('happenings')
+        .select('*, actor:actor_id(*), target:target_id(*)');
 
-    if (filterType !== 'all') {
-      query = query.eq('action_type', filterType);
-    }
-
-    if (feedType === 'global') {
-      const { data: hidden, error: hiddenError } = await supabase.from('hidden_users').select('hidden_user_id').eq('user_id', profile.id);
-      if (hiddenError) {
-        setError('Could not fetch hidden users for global feed.');
-        setLoading(false);
-        return;
-      }
-      const hiddenIds = (hidden || []).map(h => h.hidden_user_id);
-      if (hiddenIds.length > 0) {
-        query = query.not('actor_id', 'in', `(${hiddenIds.join(',')})`);
-      }
-    } else { // Personal feed
-      const { data: friends1, error: f1Error } = await supabase.from('friendships').select('user_id_2').eq('user_id_1', profile.id).eq('status', 'accepted');
-      const { data: friends2, error: f2Error } = await supabase.from('friendships').select('user_id_1').eq('user_id_2', profile.id).eq('status', 'accepted');
-      const { data: following, error: followError } = await supabase.from('follows').select('following_id').eq('follower_id', profile.id);
-      const { data: bestFriends, error: bfError } = await supabase.from('best_friends').select('best_friend_id').eq('user_id', profile.id);
-      const { data: hidden, error: hiddenError } = await supabase.from('hidden_users').select('hidden_user_id').eq('user_id', profile.id);
-      
-      if (f1Error || f2Error || followError || hiddenError || bfError) {
-          setError('Failed to fetch user relationships.');
-          setLoading(false);
-          return;
+      if (filterType !== 'all') {
+        query = query.eq('action_type', filterType);
       }
 
-      const friendIds = [...(friends1 || []).map(f => f.user_id_2), ...(friends2 || []).map(f => f.user_id_1)];
-      const followingIds = (following || []).map(f => f.following_id);
-      const bestFriendIds = (bestFriends || []).map(f => f.best_friend_id);
-      const hiddenIds = (hidden || []).map(h => h.hidden_user_id);
+      if (feedType === 'global') {
+        const { data: hidden, error: hiddenError } = await supabase.from('hidden_users').select('hidden_user_id').eq('user_id', profile.id);
+        if (hiddenError) throw hiddenError;
+        
+        const hiddenIds = (hidden || []).map(h => h.hidden_user_id);
+        if (hiddenIds.length > 0) {
+          query = query.not('actor_id', 'in', `(${hiddenIds.join(',')})`);
+        }
+      } else { // Personal feed
+        const { data: friends1, error: f1Error } = await supabase.from('friendships').select('user_id_2').eq('user_id_1', profile.id).eq('status', 'accepted');
+        const { data: friends2, error: f2Error } = await supabase.from('friendships').select('user_id_1').eq('user_id_2', profile.id).eq('status', 'accepted');
+        const { data: following, error: followError } = await supabase.from('follows').select('following_id').eq('follower_id', profile.id);
+        const { data: bestFriends, error: bfError } = await supabase.from('best_friends').select('best_friend_id').eq('user_id', profile.id);
+        const { data: hidden, error: hiddenError } = await supabase.from('hidden_users').select('hidden_user_id').eq('user_id', profile.id);
+        
+        if (f1Error || f2Error || followError || hiddenError || bfError) {
+            throw new Error('Failed to fetch user relationships.');
+        }
 
-      let relevantUserIds: string[] = [];
+        const friendIds = [...(friends1 || []).map(f => f.user_id_2), ...(friends2 || []).map(f => f.user_id_1)];
+        const followingIds = (following || []).map(f => f.following_id);
+        const bestFriendIds = (bestFriends || []).map(f => f.best_friend_id);
+        const hiddenIds = (hidden || []).map(h => h.hidden_user_id);
 
-      switch(relationshipFilter) {
-          case 'friends':
-              relevantUserIds = friendIds;
-              break;
-          case 'best_friends':
-              relevantUserIds = bestFriendIds;
-              break;
-          case 'following':
-              relevantUserIds = followingIds;
-              break;
-          case 'all':
-          default:
-              relevantUserIds = [...new Set([...friendIds, ...followingIds, profile.id])];
-              break;
+        let relevantUserIds: string[] = [];
+
+        switch(relationshipFilter) {
+            case 'friends':
+                relevantUserIds = friendIds;
+                break;
+            case 'best_friends':
+                relevantUserIds = bestFriendIds;
+                break;
+            case 'following':
+                relevantUserIds = followingIds;
+                break;
+            case 'all':
+            default:
+                relevantUserIds = [...new Set([...friendIds, ...followingIds, profile.id])];
+                break;
+        }
+
+        const userIdsToFetch = relevantUserIds.filter(id => !hiddenIds.includes(id));
+        
+        const filterString = `actor_id.in.(${userIdsToFetch.join(',')}),target_id.eq.${profile.id}`;
+        if (userIdsToFetch.length > 0) {
+          query = query.or(filterString);
+        } else {
+          // If the filtered list is empty (e.g., no best friends), we still want to fetch happenings where the user is the target
+          query = query.eq('target_id', profile.id);
+        }
       }
 
-      const userIdsToFetch = relevantUserIds.filter(id => !hiddenIds.includes(id));
-      
-      const filterString = `actor_id.in.(${userIdsToFetch.join(',')}),target_id.eq.${profile.id}`;
-      if (userIdsToFetch.length > 0) {
-        query = query.or(filterString);
-      } else {
-        // If the filtered list is empty (e.g., no best friends), we still want to fetch happenings where the user is the target
-        query = query.eq('target_id', profile.id);
-      }
-    }
+      const { data, error: happeningsError } = await query
+        .order('created_at', { ascending: false })
+        .limit(50) as { data: Happening[], error: any };
 
-    const { data, error: happeningsError } = await query
-      .order('created_at', { ascending: false })
-      .limit(50) as { data: Happening[], error: any };
+      if (happeningsError) throw happeningsError;
 
-    if (happeningsError) {
-      setError('Failed to fetch happenings.');
-      console.error(happeningsError);
-    } else {
       setHappenings(data || []);
+    } catch (err: any) {
+      setError(`Failed to fetch feed: ${err.message}`);
+      console.error(err);
+      setHappenings([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [profile, feedType, filterType, relationshipFilter]);
 
   const onAction = () => {

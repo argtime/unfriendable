@@ -18,24 +18,29 @@ const PendingFriendRequests: React.FC = () => {
     const { profile: currentUserProfile } = useAuth();
     const [requests, setRequests] = useState<PendingRequest[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [actionLoading, setActionLoading] = useState<Record<number, boolean>>({});
 
     useEffect(() => {
         const fetchRequests = async () => {
             if (!currentUserProfile) return;
             setLoading(true);
-            const { data, error } = await supabase
-                .from('friendships')
-                .select('id, user_1_profile:user_id_1(*)')
-                .eq('user_id_2', currentUserProfile.id)
-                .eq('status', 'pending');
-            
-            if (error) {
-                console.error("Failed to fetch pending requests", error);
-            } else {
+            setError(null);
+            try {
+                const { data, error: fetchError } = await supabase
+                    .from('friendships')
+                    .select('id, user_1_profile:user_id_1(*)')
+                    .eq('user_id_2', currentUserProfile.id)
+                    .eq('status', 'pending');
+
+                if (fetchError) throw fetchError;
                 setRequests(data as any[] || []);
+            } catch (err: any) {
+                setError("Couldn't load friend requests.");
+                console.error("Failed to fetch pending requests", err);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
         fetchRequests();
     }, [currentUserProfile]);
@@ -73,6 +78,15 @@ const PendingFriendRequests: React.FC = () => {
             </div>
         );
     }
+    
+    if (error) {
+        return (
+            <div className="bg-secondary p-4 rounded-lg border border-red-800/60">
+                <p className="text-center text-red-400">{error}</p>
+            </div>
+        );
+    }
+
 
     if (requests.length === 0) {
         return null; // Don't show the card if there are no requests
