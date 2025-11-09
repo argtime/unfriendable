@@ -1,0 +1,5 @@
+{
+  "name": "Unfriendable",
+  "description": "A social network with radical transparency. Every user action—friending, following, hiding, viewing profiles—is permanently recorded and shared in the feed for all friends and followers to see. Features a comprehensive friendship, 'best friend', and following system, with a special developer page for full data access and management.",
+  "requestFramePermissions": []
+}
