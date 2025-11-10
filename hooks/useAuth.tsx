@@ -12,6 +12,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const [isDev, setIsDev] = useState(false);
   const [isViewOnly, setIsViewOnly] = useState(false);
+  const [paymentRequired, setPaymentRequired] = useState(false);
 
   useEffect(() => {
     // onAuthStateChange fires an INITIAL_SESSION event on load, which handles
@@ -29,10 +30,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           
           if (profileData) {
             if (profileData.is_banned) {
-              toast.error(`Your account has been banned. Reason: ${profileData.ban_reason || 'No reason provided.'}`, { duration: 8000 });
-              await supabase.auth.signOut();
-              // No need to set state; signOut will trigger another auth event.
-              return; 
+              if (profileData.ban_reason === 'PAYMENT') {
+                setPaymentRequired(true);
+                // Do not sign out; user is locked into payment screen.
+              } else {
+                toast.error(`Your account has been banned. Reason: ${profileData.ban_reason || 'No reason provided.'}`, { duration: 8000 });
+                await supabase.auth.signOut();
+                return;
+              }
+            } else {
+              setPaymentRequired(false);
             }
             setProfile(profileData);
             setIsDev(profileData.username === 'devadmin' || currentUser.email === 'ryansh818@gmail.com');
@@ -52,6 +59,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setProfile(null);
         setIsDev(false);
         setIsViewOnly(false);
+        setPaymentRequired(false);
         setLoading(false); // We are done loading.
       }
     });
@@ -73,6 +81,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     loading,
     isDev,
     isViewOnly,
+    paymentRequired,
     signOut
   };
 

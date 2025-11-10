@@ -70,5 +70,6 @@ export interface AuthContextType {
   loading: boolean;
   isDev: boolean;
   isViewOnly: boolean;
+  paymentRequired: boolean;
   signOut: () => Promise<void>;
 }

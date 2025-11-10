@@ -14,8 +14,7 @@ const SignupPage = lazy(() => import('./pages/SignupPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const DevPage = lazy(() => import('./pages/DevPage'));
 const SearchPage = lazy(() => import('./pages/SearchPage'));
-const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
-const UpdatePasswordPage = lazy(() => import('./pages/UpdatePasswordPage'));
+const PaymentRequiredPage = lazy(() => import('./pages/PaymentRequiredPage'));
 
 const RootRedirect: React.FC = () => {
   const { user, loading } = useAuth();
@@ -32,24 +31,39 @@ const RootRedirect: React.FC = () => {
   return <Navigate to={user ? "/home" : "/login"} replace />;
 };
 
+const AppRoutes: React.FC = () => {
+  const { user, paymentRequired } = useAuth();
+
+  if (user && paymentRequired) {
+    return (
+      <Suspense fallback={<PageSkeleton />}>
+        <PaymentRequiredPage />
+      </Suspense>
+    );
+  }
+  
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center flex-grow w-full"><PageSkeleton /></div>}>
+      <Routes>
+        <Route path="/" element={<RootRedirect />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+        <Route path="/profile/:username" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="/dev" element={<ProtectedRoute><DevPage /></ProtectedRoute>} />
+        <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
+      </Routes>
+    </Suspense>
+  );
+};
+
+
 const App: React.FC = () => {
   return (
     <AuthProvider>
       <HashRouter>
         <Layout>
-          <Suspense fallback={<div className="flex justify-center items-center flex-grow w-full"><PageSkeleton /></div>}>
-            <Routes>
-              <Route path="/" element={<RootRedirect />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/signup" element={<SignupPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/update-password" element={<UpdatePasswordPage />} />
-              <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
-              <Route path="/profile/:username" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-              <Route path="/dev" element={<ProtectedRoute><DevPage /></ProtectedRoute>} />
-              <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
-            </Routes>
-          </Suspense>
+          <AppRoutes />
         </Layout>
         <Toaster position="bottom-right" toastOptions={{
           style: {

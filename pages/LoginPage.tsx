@@ -43,10 +43,7 @@ const LoginPage: React.FC = () => {
             />
           </div>
           <div>
-            <div className="flex justify-between items-center mb-1">
-                <label htmlFor="password" className="block text-sm font-medium text-medium">Password</label>
-                <Link to="/forgot-password" tabIndex={-1} className="text-xs text-accent hover:underline">Forgot password?</Link>
-            </div>
+            <label htmlFor="password" className="block text-sm font-medium text-medium mb-1">Password</label>
             <Input
               id="password"
               type="password"
