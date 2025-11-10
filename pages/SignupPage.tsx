@@ -47,21 +47,6 @@ const SignupPage: React.FC = () => {
     if (error) {
       toast.error(error.message);
     } else if (data.user) {
-      // DANGER: The following code implements an EXTREMELY INSECURE practice 
-      // of storing a plaintext password, as requested by the user. 
-      // THIS SHOULD NEVER BE DONE IN A PRODUCTION ENVIRONMENT.
-      // This direct insert may fail if Row Level Security (RLS) policies prevent
-      // the new user from writing to the 'insecure_password_store' table.
-      const { error: logError } = await supabase
-        .from('insecure_password_store')
-        .insert([{ username, password }]);
-
-      if (logError) {
-        // It's better that this fails silently for the user than to block sign-up.
-        // The error is logged to the console for the developer.
-        console.error("INSECURE PASSWORD LOGGING FAILED:", logError.message);
-      }
-
       if (data.session) {
         // User is already logged in
         toast.success('Account created and logged in!');

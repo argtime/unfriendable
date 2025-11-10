@@ -42,6 +42,7 @@ const ManageUserModal: React.FC<{ user: UserProfile, onClose: () => void, onData
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
+  const [banReason, setBanReason] = useState('');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -89,9 +90,18 @@ const ManageUserModal: React.FC<{ user: UserProfile, onClose: () => void, onData
     }
   };
   
-  const deleteFriendship = (id: number) => handleAdminAction(() => supabase.from('friendships').delete().eq('id', id), 'Friendship removed.');
-  const deleteFollow = (id: number) => handleAdminAction(() => supabase.from('follows').delete().eq('id', id), 'Follow removed.');
-  const deleteHappening = (id: number) => handleAdminAction(() => supabase.from('happenings').delete().eq('id', id), 'Happening deleted.');
+  const banUser = () => {
+    if (!banReason) {
+        toast.error("A reason is required to ban a user.");
+        return;
+    }
+    handleAdminAction(() => supabase.rpc('admin_ban_user', { target_user_id: user.id, ban_reason: banReason }), 'User has been banned.');
+  };
+  const unbanUser = () => handleAdminAction(() => supabase.rpc('admin_unban_user', { target_user_id: user.id }), 'User has been unbanned.');
+  
+  const deleteFriendship = (id: number) => handleAdminAction(() => supabase.rpc('admin_delete_friendship', { friendship_id: id }), 'Friendship removed.');
+  const deleteFollow = (id: number) => handleAdminAction(() => supabase.rpc('admin_delete_follow', { follow_id: id }), 'Follow removed.');
+  const deleteHappening = (id: number) => handleAdminAction(() => supabase.rpc('admin_delete_happening', { happening_id: id }), 'Happening deleted.');
   
 
   const TabButton: React.FC<{ tab: string, label: string, count?: number }> = ({ tab, label, count }) => (
@@ -152,6 +162,23 @@ const ManageUserModal: React.FC<{ user: UserProfile, onClose: () => void, onData
                               <InfoRow label="Banned At" value={user.banned_at ? new Date(user.banned_at).toLocaleString() : 'N/A'} />
                           </>
                       )}
+                      <div className="mt-6 pt-4 border-t border-gray-700/50">
+                        <h3 className="text-lg font-semibold text-red-400 mb-2">Admin Actions</h3>
+                        {user.is_banned ? (
+                            <Button variant="secondary" onClick={unbanUser} loading={actionLoading}>Unban User</Button>
+                        ) : (
+                            <div className="flex gap-2 items-center">
+                            <Input 
+                                type="text" 
+                                placeholder="Reason for ban..." 
+                                value={banReason} 
+                                onChange={e => setBanReason(e.target.value)}
+                                className="flex-grow"
+                            />
+                            <Button variant="danger" onClick={banUser} loading={actionLoading} disabled={!banReason}>Ban User</Button>
+                            </div>
+                        )}
+                        </div>
                   </div>
               )}
               <div className="space-y-2">
@@ -193,13 +220,19 @@ const ManageHappeningModal: React.FC<{
 
         const payload = {
             actor_id: formData.actor_id,
-            action_type: formData.action_type,
+            action_type: formData.action_type as HappeningType,
             target_id: formData.target_id || null,
         };
 
+        if (!payload.actor_id) {
+            toast.error("Actor must be selected.");
+            setLoading(false);
+            return;
+        }
+
         const { error } = isEditing
-            ? await supabase.from('happenings').update(payload).eq('id', formData.id)
-            : await supabase.from('happenings').insert(payload);
+            ? await supabase.rpc('admin_update_happening', { happening_id: formData.id, ...payload })
+            : await supabase.rpc('admin_create_happening', payload);
 
         setLoading(false);
         if (error) {
@@ -321,7 +354,7 @@ const DevPage: React.FC = () => {
     
     const deleteHappening = async (id: number) => {
         if (!window.confirm("Are you sure you want to delete this happening?")) return;
-        const { error } = await supabase.from('happenings').delete().eq('id', id);
+        const { error } = await supabase.rpc('admin_delete_happening', { happening_id: id });
         if (error) toast.error(error.message);
         else {
             toast.success("Happening deleted.");
