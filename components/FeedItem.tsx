@@ -13,7 +13,8 @@ const iconMap: { [key in HappeningType]: { icon: React.ElementType, gradient: st
   ACCEPTED_FRIEND_REQUEST: { icon: CheckCircleIcon, gradient: 'from-green-500/30 to-green-500/10', textColor: 'text-green-400' },
   REJECTED_FRIEND_REQUEST: { icon: XCircleIcon, gradient: 'from-red-500/30 to-red-500/10', textColor: 'text-red-400' },
   REMOVED_FRIEND: { icon: UserMinusIcon, gradient: 'from-red-500/30 to-red-500/10', textColor: 'text-red-400' },
-  MADE_BEST_FRIEND: { icon: HeartIcon, gradient: 'from-pink-500/30 to-pink-500/10', textColor: 'text-pink-400' },
+  SENT_BEST_FRIEND_REQUEST: { icon: HeartIcon, gradient: 'from-blue-500/30 to-blue-500/10', textColor: 'text-blue-400' },
+  ADDED_BEST_FRIEND: { icon: HeartIcon, gradient: 'from-pink-500/30 to-pink-500/10', textColor: 'text-pink-400' },
   REMOVED_BEST_FRIEND: { icon: HeartIcon, gradient: 'from-gray-500/30 to-gray-500/10', textColor: 'text-gray-400' },
   REJECTED_BEST_FRIEND_STATUS: { icon: XCircleIcon, gradient: 'from-orange-500/30 to-orange-500/10', textColor: 'text-orange-400' },
   FOLLOWED_USER: { icon: RssIcon, gradient: 'from-teal-500/30 to-teal-500/10', textColor: 'text-teal-400' },
@@ -50,8 +51,10 @@ const FeedItem: React.FC<{ happening: Happening }> = ({ happening }) => {
         return <>{ActorLink} rejected a friend request from {TargetLink}.</>;
       case 'REMOVED_FRIEND':
         return <>{ActorLink} removed {TargetLink} as a friend.</>;
-      case 'MADE_BEST_FRIEND':
-        return <>{ActorLink} made {TargetLink} a best friend.</>;
+      case 'SENT_BEST_FRIEND_REQUEST':
+        return <>{ActorLink} sent a best friend request to {TargetLink}.</>;
+      case 'ADDED_BEST_FRIEND':
+        return <>{ActorLink} added {TargetLink} as a best friend.</>;
       case 'REMOVED_BEST_FRIEND':
         return <>{ActorLink} removed {TargetLink} as a best friend.</>;
       case 'REJECTED_BEST_FRIEND_STATUS':

@@ -164,8 +164,10 @@ const ProfilePage: React.FC = () => {
 
     const onRemoveFriend = () => handleAction('removeFriend', () => Promise.all([
         supabase.from('friendships').delete().or(`and(user_id_1.eq.${currentUserProfile!.id},user_id_2.eq.${profile!.id}),and(user_id_1.eq.${profile!.id},user_id_2.eq.${currentUserProfile!.id})`),
-        supabase.from('happenings').insert({ actor_id: currentUserProfile!.id, action_type: 'REMOVED_FRIEND', target_id: profile!.id })
-    ]), "Friend removed.", () => setProfile(p => p && ({ ...p, is_friend: false, is_best_friend: false })));
+        supabase.from('happenings').insert({ actor_id: currentUserProfile!.id, action_type: 'REMOVED_FRIEND', target_id: profile!.id }),
+        // Also remove any best friend relationships
+        supabase.from('best_friends').delete().or(`and(user_id.eq.${currentUserProfile!.id},best_friend_id.eq.${profile!.id}),and(user_id.eq.${profile!.id},best_friend_id.eq.${currentUserProfile!.id})`)
+    ]), "Friend removed.", () => setProfile(p => p && ({ ...p, is_friend: false, is_best_friend: false, is_best_friend_by: false })));
 
     const onFollow = () => handleAction('follow', () => Promise.all([
         supabase.from('follows').insert({ follower_id: currentUserProfile!.id, following_id: profile!.id }),
@@ -177,9 +179,9 @@ const ProfilePage: React.FC = () => {
         supabase.from('happenings').insert({ actor_id: currentUserProfile!.id, action_type: 'UNFOLLOWED_USER', target_id: profile!.id })
     ]), `Unfollowed ${profile?.display_name}`, () => setProfile(p => p && ({ ...p, is_following: false })));
 
-    const onMakeBestFriend = () => handleAction('addBestFriend', () => Promise.all([
+    const onAddBestFriend = () => handleAction('addBestFriend', () => Promise.all([
         supabase.from('best_friends').insert({ user_id: currentUserProfile!.id, best_friend_id: profile!.id }),
-        supabase.from('happenings').insert({ actor_id: currentUserProfile!.id, action_type: 'MADE_BEST_FRIEND', target_id: profile!.id })
+        supabase.from('happenings').insert({ actor_id: currentUserProfile!.id, action_type: 'ADDED_BEST_FRIEND', target_id: profile!.id })
     ]), `${profile?.display_name} is now a best friend!`, () => setProfile(p => p && ({ ...p, is_best_friend: true })));
 
     const onRemoveBestFriend = () => handleAction('removeBestFriend', () => Promise.all([
@@ -379,11 +381,11 @@ const ProfilePage: React.FC = () => {
                                     {profile.is_friend && (
                                         <Button
                                             variant="secondary"
-                                            onClick={profile.is_best_friend ? onRemoveBestFriend : onMakeBestFriend}
+                                            onClick={profile.is_best_friend ? onRemoveBestFriend : onAddBestFriend}
                                             disabled={!!actionLoading}
                                         >
                                             <HeartIcon className="h-5 w-5 mr-2" />
-                                            {profile.is_best_friend ? 'Remove Best Friend' : 'Make Best Friend'}
+                                            {profile.is_best_friend ? 'Remove Best Friend' : 'Add Best Friend'}
                                         </Button>
                                     )}
                                     <Button

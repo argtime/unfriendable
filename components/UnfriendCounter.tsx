@@ -29,6 +29,7 @@ const UnfriendCounter: React.FC = () => {
                 event: '*', 
                 schema: 'public', 
                 table: 'happenings',
+                filter: 'action_type=eq.REMOVED_FRIEND'
             }, fetchCount)
             .subscribe();
 
